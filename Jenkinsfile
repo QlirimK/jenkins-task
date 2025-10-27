@@ -13,16 +13,20 @@ pipeline {
     TEST_RESULTS_DIR = "test-results"
   }
 
-  stages {
-    stage('Checkout') { steps { checkout scm } }
+  stage('Build Docker Image') {
+  steps {
+    powershell '''
+      $ErrorActionPreference = "Stop"
+      docker version
 
-    stage('Build Docker Image') {
-      steps {
-        powershell '''
-          docker build -t "$env:IMAGE_NAME:$env:IMAGE_TAG" -t "$env:IMAGE_NAME:latest" .
-        '''
-      }
-    }
+      docker build --file Dockerfile `
+        --tag "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
+        --tag "$($env:IMAGE_NAME):latest" `
+        .
+    '''
+  }
+}
+
 
     stage('Run Tests (in container)') {
       steps {
