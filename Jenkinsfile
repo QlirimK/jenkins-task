@@ -35,16 +35,23 @@ pipeline {
   steps {
     powershell '''
       $ErrorActionPreference = "Stop"
+
+      # Host-Ordner neu anlegen
       $hostResults = Join-Path $PWD $env:TEST_RESULTS_DIR
       if (Test-Path $hostResults) { Remove-Item -Recurse -Force $hostResults }
       New-Item -ItemType Directory -Force -Path $hostResults | Out-Null
 
+      # Absoluten Pfad ermitteln (z.B. C:\...\jenkins-task\test-results)
+      $hostResultsFull = (Resolve-Path $hostResults).Path
+
+      # Container-Tests ausführen und JUnit in /test-results schreiben
       docker run --rm `
         -e CI=true `
-        -v "$hostResults:/test-results" `
+        -v "$($hostResultsFull):/test-results" `
         "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
         sh -c "npm ci && npm test"
 
+      # Sicherstellen, dass junit.xml existiert
       if (!(Test-Path (Join-Path $hostResults 'junit.xml'))) {
         Write-Host 'DEBUG: Inhalt von test-results:'
         Get-ChildItem -Recurse $hostResults | Format-List -Property FullName,Length,LastWriteTime
@@ -59,6 +66,7 @@ pipeline {
     }
   }
 }
+
 
 
 
