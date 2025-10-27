@@ -1,5 +1,11 @@
-
 export default {
   testEnvironment: 'node',
-  transform: {} // kein Babel nötig
+  transform: {},
+  reporters: [
+    'default',
+    ['jest-junit', {
+      outputDirectory: '/test-results',
+      outputName: 'junit.xml'
+    }]
+  ]
 };

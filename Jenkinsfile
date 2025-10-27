@@ -35,23 +35,31 @@ pipeline {
   steps {
     powershell '''
       $ErrorActionPreference = "Stop"
-      New-Item -ItemType Directory -Force -Path "$PWD\\$env:TEST_RESULTS_DIR" | Out-Null
+      $hostResults = Join-Path $PWD $env:TEST_RESULTS_DIR
+      if (Test-Path $hostResults) { Remove-Item -Recurse -Force $hostResults }
+      New-Item -ItemType Directory -Force -Path $hostResults | Out-Null
 
       docker run --rm `
         -e CI=true `
-        -e JEST_JUNIT_OUTPUT=/test-results/junit.xml `
-        -v "$PWD\\$env:TEST_RESULTS_DIR:/test-results" `
+        -v "$hostResults:/test-results" `
         "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
         sh -c "npm ci && npm test"
+
+      if (!(Test-Path (Join-Path $hostResults 'junit.xml'))) {
+        Write-Host 'DEBUG: Inhalt von test-results:'
+        Get-ChildItem -Recurse $hostResults | Format-List -Property FullName,Length,LastWriteTime
+        throw 'junit.xml wurde nicht erzeugt.'
+      }
     '''
   }
   post {
     always {
-      junit allowEmptyResults: true, testResults: "${TEST_RESULTS_DIR}/junit.xml"
+      junit allowEmptyResults: false, testResults: "${TEST_RESULTS_DIR}/junit.xml"
       archiveArtifacts artifacts: "${TEST_RESULTS_DIR}/**", fingerprint: true, onlyIfSuccessful: false
     }
   }
 }
+
 
 
 
