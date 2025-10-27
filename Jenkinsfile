@@ -1,6 +1,6 @@
 pipeline {
   agent any
-  options { timestamps(); disableConcurrentBuilds() }  // kein ansiColor
+  options { timestamps(); disableConcurrentBuilds() }
 
   environment {
     REGISTRY_CREDENTIALS = 'dockerhub-creds'
@@ -8,29 +8,33 @@ pipeline {
     DOCKER_REPO = 'node-app'
     K8S_NAMESPACE = 'devops-demo'
     IMAGE_NAME = "${env.DOCKERHUB_USER}/${env.DOCKER_REPO}"
-    SHORT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
+    SHORT_SHA  = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
     IMAGE_TAG  = "${env.SHORT_SHA}"
     TEST_RESULTS_DIR = "test-results"
   }
 
-  stage('Build Docker Image') {
-  steps {
-    powershell '''
-      $ErrorActionPreference = "Stop"
-      docker version
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
 
-      docker build --file Dockerfile `
-        --tag "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
-        --tag "$($env:IMAGE_NAME):latest" `
-        .
-    '''
-  }
-}
-
+    stage('Build Docker Image') {
+      steps {
+        powershell '''
+          $ErrorActionPreference = "Stop"
+          docker version
+          docker build --file Dockerfile `
+            --tag "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
+            --tag "$($env:IMAGE_NAME):latest" `
+            .
+        '''
+      }
+    }
 
     stage('Run Tests (in container)') {
       steps {
         powershell '''
+          $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path "$PWD\\$env:TEST_RESULTS_DIR" | Out-Null
           docker run --rm `
             -e CI=true `
@@ -67,6 +71,7 @@ pipeline {
     stage('Deploy to Kubernetes') {
       steps {
         powershell '''
+          $ErrorActionPreference="Stop"
           kubectl get ns $env:K8S_NAMESPACE 2>$null | Out-Null
           if ($LASTEXITCODE -ne 0) { kubectl create ns $env:K8S_NAMESPACE }
           kubectl -n $env:K8S_NAMESPACE apply -f k8s/
@@ -78,7 +83,7 @@ pipeline {
   }
 
   post {
-    success { echo "✅ Deployed $IMAGE_NAME:$IMAGE_TAG" }
+    success { echo "✅ Deployed ${env.IMAGE_NAME}:${env.IMAGE_TAG}" }
     failure { echo "❌ Pipeline failed" }
   }
 }
