@@ -32,25 +32,27 @@ pipeline {
     }
 
     stage('Run Tests (in container)') {
-      steps {
-        powershell '''
-          $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force -Path "$PWD\\$env:TEST_RESULTS_DIR" | Out-Null
-          docker run --rm `
-            -e CI=true `
-            -e JEST_JUNIT_OUTPUT=/test-results/junit.xml `
-            -v "$PWD\\$env:TEST_RESULTS_DIR:/test-results" `
-            "$env:IMAGE_NAME:$env:IMAGE_TAG" `
-            sh -c "npm ci && npm test -- --ci --reporters=default --reporters=jest-junit"
-        '''
-      }
-      post {
-        always {
-          junit allowEmptyResults: true, testResults: "${TEST_RESULTS_DIR}/junit.xml"
-          archiveArtifacts artifacts: "${TEST_RESULTS_DIR}/**", fingerprint: true, onlyIfSuccessful: false
-        }
-      }
+  steps {
+    powershell '''
+      $ErrorActionPreference = "Stop"
+      New-Item -ItemType Directory -Force -Path "$PWD\\$env:TEST_RESULTS_DIR" | Out-Null
+
+      docker run --rm `
+        -e CI=true `
+        -e JEST_JUNIT_OUTPUT=/test-results/junit.xml `
+        -v "$PWD\\$env:TEST_RESULTS_DIR:/test-results" `
+        "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
+        sh -c "npm ci && npm test -- --ci --reporters=default --reporters=jest-junit"
+    '''
+  }
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: "${TEST_RESULTS_DIR}/junit.xml"
+      archiveArtifacts artifacts: "${TEST_RESULTS_DIR}/**", fingerprint: true, onlyIfSuccessful: false
     }
+  }
+}
+
 
     stage('Push to Docker Hub') {
       steps {
