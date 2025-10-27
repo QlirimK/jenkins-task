@@ -1,6 +1,6 @@
 pipeline {
   agent any
-  options { timestamps(); ansiColor('xterm'); disableConcurrentBuilds() }
+  options { timestamps(); disableConcurrentBuilds() }  // kein ansiColor
 
   environment {
     REGISTRY_CREDENTIALS = 'dockerhub-creds'
