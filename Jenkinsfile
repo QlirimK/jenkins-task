@@ -68,34 +68,51 @@ pipeline {
 }
 
     stage('Push to Docker Hub') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS, usernameVariable: 'DOCKERHUB_USER_C', passwordVariable: 'DOCKERHUB_PASS_C')]) {
-          powershell '''
-            $ErrorActionPreference="Stop"
-            $pass = $env:DOCKERHUB_PASS_C
-            docker logout | Out-Null
-            $pass | docker login -u "$env:DOCKERHUB_USER_C" --password-stdin
-            docker push "$env:IMAGE_NAME:$env:IMAGE_TAG"
-            docker push "$env:IMAGE_NAME:latest"
-            docker logout
-          '''
-        }
-      }
-    }
+  steps {
+    withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS, usernameVariable: 'DOCKERHUB_USER_C', passwordVariable: 'DOCKERHUB_PASS_C')]) {
+      powershell '''
+        $ErrorActionPreference="Stop"
 
-    stage('Deploy to Kubernetes') {
-      steps {
-        powershell '''
-          $ErrorActionPreference="Stop"
-          kubectl get ns $env:K8S_NAMESPACE 2>$null | Out-Null
-          if ($LASTEXITCODE -ne 0) { kubectl create ns $env:K8S_NAMESPACE }
-          kubectl -n $env:K8S_NAMESPACE apply -f k8s/
-          kubectl -n $env:K8S_NAMESPACE set image deploy/node-app node-app="$env:IMAGE_NAME:$env:IMAGE_TAG" --record=true
-          kubectl -n $env:K8S_NAMESPACE rollout status deploy/node-app
-        '''
-      }
+        # sanity: zeige die Images, die wir gleich pushen
+        docker image ls "$($env:IMAGE_NAME)"
+
+        # Login
+        $pass = $env:DOCKERHUB_PASS_C
+        docker logout | Out-Null
+        $pass | docker login -u "$env:DOCKERHUB_USER_C" --password-stdin
+
+        # Push beide Tags
+        docker push "$($env:IMAGE_NAME):$($env:IMAGE_TAG)"
+        docker push "$($env:IMAGE_NAME):latest"
+
+        docker logout
+      '''
     }
   }
+}
+
+
+    stage('Deploy to Kubernetes') {
+  steps {
+    withCredentials([file(credentialsId: 'kubeconfig-docker-desktop', variable: 'KUBECONFIG_FILE')]) {
+      powershell '''
+        $ErrorActionPreference="Stop"
+        # Kubeconfig für diesen Prozess setzen
+        $env:KUBECONFIG = "$env:KUBECONFIG_FILE"
+
+        kubectl version --short
+
+        kubectl get ns $env:K8S_NAMESPACE 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { kubectl create ns $env:K8S_NAMESPACE }
+
+        kubectl -n $env:K8S_NAMESPACE apply -f k8s/
+        kubectl -n $env:K8S_NAMESPACE set image deploy/node-app node-app="$($env:IMAGE_NAME):$($env:IMAGE_TAG)" --record=true
+        kubectl -n $env:K8S_NAMESPACE rollout status deploy/node-app
+      '''
+    }
+  }
+}
+
 
   post {
     success { echo "✅ Deployed ${env.IMAGE_NAME}:${env.IMAGE_TAG}" }
