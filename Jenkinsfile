@@ -36,15 +36,15 @@ pipeline {
     powershell '''
       $ErrorActionPreference = "Stop"
 
-      # Host-Ordner neu anlegen
+      # Host-Ergebnisordner frisch anlegen
       $hostResults = Join-Path $PWD $env:TEST_RESULTS_DIR
       if (Test-Path $hostResults) { Remove-Item -Recurse -Force $hostResults }
       New-Item -ItemType Directory -Force -Path $hostResults | Out-Null
 
-      # Absoluten Pfad ermitteln (z.B. C:\...\jenkins-task\test-results)
+      # Absoluten Pfad ermitteln
       $hostResultsFull = (Resolve-Path $hostResults).Path
 
-      # Container-Tests ausführen und JUnit in /test-results schreiben
+      # Tests im Container ausführen; Jest schreibt JUnit nach /test-results
       docker run --rm `
         -e CI=true `
         -v "$($hostResultsFull):/test-results" `
@@ -66,10 +66,6 @@ pipeline {
     }
   }
 }
-
-
-
-
 
     stage('Push to Docker Hub') {
       steps {
