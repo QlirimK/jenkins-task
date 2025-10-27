@@ -42,7 +42,7 @@ pipeline {
         -e JEST_JUNIT_OUTPUT=/test-results/junit.xml `
         -v "$PWD\\$env:TEST_RESULTS_DIR:/test-results" `
         "$($env:IMAGE_NAME):$($env:IMAGE_TAG)" `
-        sh -c "npm ci && npm test -- --ci --reporters=default --reporters=jest-junit"
+        sh -c "npm ci && npm test"
     '''
   }
   post {
@@ -52,6 +52,7 @@ pipeline {
     }
   }
 }
+
 
 
     stage('Push to Docker Hub') {
